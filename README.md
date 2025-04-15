@@ -35,7 +35,9 @@ gcc main.c -o server
 
 There are a few things I'd like to add or improve over time:
 
+- Refactor C code (I know it's not pretty, but it's mine and it works)
 - Create a debian package that handles systemd service setup and binary installation
 - Include update script that allows any user to pull site updates from the repo
 - Detect and prevent directory traversal attacks
 - Add basic logging for requests and server activity
+- Use configuration files (JSON, YAML) instead of hardcoded values for better flexibility
