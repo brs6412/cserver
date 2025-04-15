@@ -13,7 +13,7 @@ I wanted to learn how HTTP servers work at a lower level, without relying on fra
 
 ## How it works
 
-The server listens on a port and handles basic HTTP GET requests. It serves files out of the `build/` directory, which contains the static output from my React app.
+The server listens on port 4221 and handles basic HTTP GET requests. It serves files out of the `build/` directory, which contains the static output from my React app.
 
 When a request comes in, the server:
 
