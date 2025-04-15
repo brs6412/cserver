@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <string.h>
@@ -11,16 +13,29 @@
 #define BUFFER          1024
 #define HTTP_METHOD     7
 #define MAX_BACKLOG     5
+#define MAX_PATH_LENGTH 2048
 #define NUM_ENDPOINTS   2
 #define RESPONSE_LEN    50
 
 const char *HTTP_200_OK = "HTTP/1.1 200 OK\r\n";
 const char *HTTP_NOT_FOUND = "HTTP/1.1 404 Not Found\r\n";
 
+int server_fd = -1;
+
+void sigintHandler(int sig) {
+    printf("\nExiting gracefully...\n");
+    if (server_fd != -1) {
+        close(server_fd);
+        printf("Server socket closed.\n");
+    }
+    exit(0);
+}
+
 /**
  * Returns the MIME type when responding with content.
  */
 const char *get_mime_type(const char *filename) {
+    printf("Checking %s\n", filename);
     if (strstr(filename, ".html")) return "text/html";
     if (strstr(filename, ".css")) return "text/css";
     if (strstr(filename, ".js")) return "text/javascript";
@@ -59,36 +74,110 @@ void get_method(char *request, char *result) {
  *      0 on success, -1 if the requested file is not found (TODO: return -1 if path traversal attack)
  */
 int file_exists(const char *target, char *file_path) {
-    struct stat buffer;
-    int found = stat(target, &buffer); 
-    if (found == 0) {
-        snprintf(file_path, 2048, "public%s", target);
-        printf("%s", file_path);
+    if (strcmp(target, "/") == 0) {
+        snprintf(file_path, MAX_PATH_LENGTH, "public/index.html");
         return 0;
     }
+
+    struct stat buffer;
+
+    snprintf(file_path, MAX_PATH_LENGTH, "public%s", target);
+    printf("Looking for %s\n", target);
+    if (stat(file_path, &buffer) == 0) {
+        printf("Set file path to: %s\n", file_path);
+        return 0;
+    }
+    printf("Couldnt find it.\n");
     return -1;
 } 
 
+ssize_t send_all(int client_fd, const void *buffer, size_t length) {
+    ssize_t total = 0;
+    const char *buf_ptr = (const char *)buffer;
+
+    while (total < length) {
+        ssize_t sent = send(client_fd, buf_ptr + total, length - total, 0);
+        if (sent == -1) {
+            perror("Error sending data");
+            return -1;
+        }
+        total += sent;
+    }
+    return total;
+}
+
 /**
- * Parses the HTTP request and determines if the request is valid.
+ * Parses the HTTP request and sends the appropriate response. 
  * 
  * Parameters:
- *      request: The HTTP request (unmodified)
- * 
- * Returns:
- *      0 on success, -1 if the request is invalid
+ *      client_fd:  The clients file descriptor 
+ *      request:    The HTTP request (unmodified)
  */
-int handle_get(char *request) {
-    char *line = strdup(request);
-    char *ptr = strtok(line, " ");
+int handle_get(int client_fd, char *request) {
+    char response[RESPONSE_LEN];
+    char *ptr = strtok(request, " ");
+    char path[MAX_PATH_LENGTH];
+
     ptr = strtok(NULL, " ");
-    printf("%s\n", ptr);
-    if (!file_exists(ptr)) {
-        return -1;
+    printf("First request token: %s\n", ptr);
+    int exists = -1;
+    if (ptr != NULL) {
+        exists = file_exists(ptr, path);
+        printf("They set path to %s\n", path);
+    }
+
+    if (ptr == NULL || exists == -1){
+        printf("Inside the first if: %s\n", ptr);
+        snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found\r\n\r\n");
+        if (send_all(client_fd, response, strlen(response)) == -1) {
+            printf("Error sending 404 not found.\n");
+            return -1;
+        }
+        perror("Requested file not found.");
+        return 0;
     }        
     ptr = strtok(NULL, " ");
-    printf("%s", ptr); 
-    return (ptr != NULL && strcmp(ptr, "HTTP/1.1") == 0) ? 0 : -1; 
+    printf("Next token: %s\n", ptr); 
+    if (ptr != NULL && strcmp(ptr, "HTTP/1.1") != 0) {
+        printf("Inside the second if: %s\n", ptr);
+        snprintf(response, sizeof(response), "HTTP/1.1 400 Bad Request\r\n\r\n");
+        if (send_all(client_fd, response, strlen(response)) == -1) {
+            printf("Error sending 400 bad request.\n");
+            return -1;
+        }
+        perror("Bad request.");
+        return 0;
+
+    } 
+    const char *header_template = 
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Connection: close\r\n"
+        "\r\n";
+    const char *content_type = get_mime_type(path);
+    printf("Content type: %s\n", content_type);
+    char http_header[BUFFER];
+    snprintf(http_header, sizeof(http_header), header_template, content_type);
+    if (send_all(client_fd, http_header, strlen(http_header)) == -1) {
+        printf("Ran into error sending response header: %s...\n", strerror(errno));
+        return -1;
+    }
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        printf("Error opening file %s\n", path);
+        return -1;
+    }
+    char file_buf[BUFFER];
+    size_t bytes_read;
+    while((bytes_read = fread(file_buf, 1, sizeof(file_buf), file)) > 0) {
+        if (send_all(client_fd, file_buf, bytes_read) == -1) {
+            printf("Ran into error sending response: %s...\n", strerror(errno));
+            fclose(file);
+            return -1;
+        }
+    }
+    printf("Closing file\n");
+    fclose(file); 
 }
 
 /**
@@ -101,61 +190,54 @@ void handle_client(int client_fd) {
     char method[HTTP_METHOD] = {0};
     get_method(buf, method);
 
-    char response[RESPONSE_LEN];
-    strncpy(response, "HTTP/1.1 404 Not Found\r\n\r\n", RESPONSE_LEN - 1);
 
     if (strcmp(method, "GET") == 0) {
         char *request_line = strtok(buf, "\r\n");
-        if (request_line != NULL && handle_get(request_line)) {
-            strncpy(response, "HTTP/1.1 200 OK\r\n\r\n", RESPONSE_LEN - 1);
+        if (request_line != NULL) {
+            printf("Handling get\n");
+            handle_get(client_fd, request_line);
         }
-    }
-
-    printf("Sending %s", response);
-    int sizeo = sizeof(response);
-    int len = strlen(response);
-    printf("%d %d\n",sizeo, len);
-    if (send(client_fd, response, len, 0) == -1) {
-        printf("Ran into error sending response: %s...\n", strerror(errno));
     }
 }
 
 int main() {
-	int     client_fd, server_fd, client_addr_len;
-	struct  sockaddr_in client_addr;
+    int     client_fd, client_addr_len;
+    struct  sockaddr_in client_addr;
 
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_fd == -1) {
-	    printf("Socket creation failed: %s...\n", strerror(errno));
-	    return 1;
-	}
-	
-	struct sockaddr_in serv_addr = { .sin_family = AF_INET ,
-									 .sin_port = htons(4221),
-									 .sin_addr = { htonl(INADDR_ANY) },
-									};
+    signal(SIGINT, sigintHandler);
 
-	if (bind(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
-	    printf("Bind failed: %s \n", strerror(errno));
-	    return 1;
-	}
-	
-	int connection_backlog = MAX_BACKLOG;
-	if (listen(server_fd, connection_backlog) != 0) {
-	    printf("Listen failed: %s \n", strerror(errno));
-	    return 1;
-	}
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        printf("Socket creation failed: %s...\n", strerror(errno));
+        return 1;
+    }
     
-	printf("Waiting for a client to connect...\n");
-	client_addr_len = sizeof(client_addr);
-	
+    struct sockaddr_in serv_addr = { .sin_family = AF_INET ,
+                                     .sin_port = htons(4221),
+                                     .sin_addr = { htonl(INADDR_ANY) },
+                                    };
+
+    if (bind(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
+        printf("Bind failed: %s \n", strerror(errno));
+        return 1;
+    }
+    
+    int connection_backlog = MAX_BACKLOG;
+    if (listen(server_fd, connection_backlog) != 0) {
+        printf("Listen failed: %s \n", strerror(errno));
+        return 1;
+    }
+    
+    printf("Waiting for a client to connect...\n");
+    client_addr_len = sizeof(client_addr);
+    
     while ((client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len))) {
         printf("Client connected\n");
-        // handle client
+        handle_client(client_fd);
         close(client_fd);
     }
 
-	close(server_fd);
+    close(server_fd);
 
-	return 0;
+    return 0;
 }
