@@ -35,7 +35,6 @@ void sigintHandler(int sig) {
  * Returns the MIME type when responding with content.
  */
 const char *get_mime_type(const char *filename) {
-    printf("Checking %s\n", filename);
     if (strstr(filename, ".html")) return "text/html";
     if (strstr(filename, ".css")) return "text/css";
     if (strstr(filename, ".js")) return "text/javascript";
@@ -82,12 +81,9 @@ int file_exists(const char *target, char *file_path) {
     struct stat buffer;
 
     snprintf(file_path, MAX_PATH_LENGTH, "public%s", target);
-    printf("Looking for %s\n", target);
     if (stat(file_path, &buffer) == 0) {
-        printf("Set file path to: %s\n", file_path);
         return 0;
     }
-    printf("Couldnt find it.\n");
     return -1;
 } 
 
@@ -119,30 +115,23 @@ int handle_get(int client_fd, char *request) {
     char path[MAX_PATH_LENGTH];
 
     ptr = strtok(NULL, " ");
-    printf("First request token: %s\n", ptr);
     int exists = -1;
     if (ptr != NULL) {
         exists = file_exists(ptr, path);
-        printf("They set path to %s\n", path);
     }
 
     if (ptr == NULL || exists == -1){
-        printf("Inside the first if: %s\n", ptr);
         snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found\r\n\r\n");
         if (send_all(client_fd, response, strlen(response)) == -1) {
-            printf("Error sending 404 not found.\n");
             return -1;
         }
         perror("Requested file not found.");
         return 0;
     }        
     ptr = strtok(NULL, " ");
-    printf("Next token: %s\n", ptr); 
     if (ptr != NULL && strcmp(ptr, "HTTP/1.1") != 0) {
-        printf("Inside the second if: %s\n", ptr);
         snprintf(response, sizeof(response), "HTTP/1.1 400 Bad Request\r\n\r\n");
         if (send_all(client_fd, response, strlen(response)) == -1) {
-            printf("Error sending 400 bad request.\n");
             return -1;
         }
         perror("Bad request.");
@@ -155,28 +144,23 @@ int handle_get(int client_fd, char *request) {
         "Connection: close\r\n"
         "\r\n";
     const char *content_type = get_mime_type(path);
-    printf("Content type: %s\n", content_type);
     char http_header[BUFFER];
     snprintf(http_header, sizeof(http_header), header_template, content_type);
     if (send_all(client_fd, http_header, strlen(http_header)) == -1) {
-        printf("Ran into error sending response header: %s...\n", strerror(errno));
         return -1;
     }
     FILE *file = fopen(path, "r");
     if (file == NULL) {
-        printf("Error opening file %s\n", path);
         return -1;
     }
     char file_buf[BUFFER];
     size_t bytes_read;
     while((bytes_read = fread(file_buf, 1, sizeof(file_buf), file)) > 0) {
         if (send_all(client_fd, file_buf, bytes_read) == -1) {
-            printf("Ran into error sending response: %s...\n", strerror(errno));
             fclose(file);
             return -1;
         }
     }
-    printf("Closing file\n");
     fclose(file); 
 }
 
@@ -194,7 +178,6 @@ void handle_client(int client_fd) {
     if (strcmp(method, "GET") == 0) {
         char *request_line = strtok(buf, "\r\n");
         if (request_line != NULL) {
-            printf("Handling get\n");
             handle_get(client_fd, request_line);
         }
     }
