@@ -115,12 +115,8 @@ int handle_get(int client_fd, char *request) {
     char path[MAX_PATH_LENGTH];
 
     ptr = strtok(NULL, " ");
-    int exists = -1;
-    if (ptr != NULL) {
-        exists = file_exists(ptr, path);
-    }
 
-    if (ptr == NULL || exists == -1){
+    if (ptr == NULL || file_exists(ptr, path) == -1){
         snprintf(response, sizeof(response), "HTTP/1.1 404 Not Found\r\n\r\n");
         if (send_all(client_fd, response, strlen(response)) == -1) {
             return -1;
