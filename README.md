@@ -29,3 +29,13 @@ There’s no support for POST requests or routing logic — it’s purely for se
 ```bash
 gcc main.c -o server
 ./server
+```
+
+## Future Improvements
+
+There are a few things I'd like to add or improve over time:
+
+- Create a debian packages that handles systemd service setup and binary installation
+- Include update script that allows any user to pull site updates from the repo
+- Detect and prevent directory traversal attacks
+- Add basic logging for requests and server activity
