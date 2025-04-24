@@ -22,7 +22,7 @@ When a request comes in, the server:
 3. Reads the file and sends the contents back to the client
 4. Sets the appropriate `Content-Type` header based on the file extension
 
-There’s no support for POST requests or routing logic — it’s purely for serving static files.
+There’s no support for POST requests or routing logic, it’s purely for serving static files.
 
 ## How to run it
 
