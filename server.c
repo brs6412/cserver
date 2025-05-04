@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <netinet/ip.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "http_handler.h"
 #include "http_status.h"
@@ -48,35 +49,6 @@ int init_server(struct HttpServer *server, int port) {
 }
 
 /**
- * Checks the public/ folder for the file found in the HttpRequest struct and constructs the full path.
- * 
- * Parameters:
- *      request: HttpRequest struct the filepath will be written to.
- *              
- * Returns:
- *      0 on success, -1 if the requested file is not found (TODO: return -1 if path traversal attack)
- */
-int file_exists(struct HttpRequest *request) {
-    char target[MAX_PATH_LEN];
-    strncpy(target, request->path, sizeof(target) - 1);
-    target[sizeof(target) - 1] = '\0';
-
-    if (strcmp(target, "/") == 0) {
-        snprintf(request->path, MAX_PATH_LEN, "public/index.html");
-        return 0;
-    }
-
-    struct stat buffer;
-
-    snprintf(request->path, MAX_PATH_LEN, "public%s", target);
-    if (stat(request->path, &buffer) == 0) {
-        request->file_size = buffer.st_size;
-        return 0;
-    }
-    return -1;
-}
-
-/**
  * Clears the entire buffer by sending to the given file descriptor.
  *
  * Parameters:
@@ -108,7 +80,7 @@ ssize_t send_all(int client_fd, const void *buffer, size_t length) {
 void handle_client(int client_fd) {
     int response_size;
     char buf[REQUEST_LEN];
-    char http_header[RESPONSE_LEN];
+    char response_buf[RESPONSE_LEN];
 
     ssize_t received = recv(client_fd, buf, sizeof(buf), 0); 
     if (received < 0) {
@@ -119,20 +91,49 @@ void handle_client(int client_fd) {
     struct HttpRequest request = { .file_size = 0 };
     int valid_request = http_parse_request(buf, &request);
     if (valid_request == -1) {
-        response_size = http_build_response(&request, HTTP_STATUS_BAD_REQUEST, http_header);
-        send_all(client_fd, http_header, response_size);
+        response_size = http_build_response(&request, HTTP_STATUS_BAD_REQUEST, response_buf);
+        send_all(client_fd, response_buf, response_size);
         return;
     }
     
-    int valid_filepath = file_exists(&request); 
-    if (valid_filepath == -1) {
-        response_size = http_build_response(&request, HTTP_STATUS_NOT_FOUND, http_header);
-        send_all(client_fd, http_header, response_size);
+    char target[MAX_PATH_LEN];
+    strncpy(target, request.path, sizeof(target) - 1);
+    target[sizeof(target) - 1] = '\0';
+
+    if (strcmp(target, "/") == 0) {
+        snprintf(request.path, MAX_PATH_LEN, "public/index.html");
+    } else {
+        snprintf(request.path, MAX_PATH_LEN, "public%s", target);
+    }
+
+    int file_fd = open(request.path, O_RDONLY);
+    if (file_fd == -1) {
+        response_size = http_build_response(&request, HTTP_STATUS_NOT_FOUND, response_buf);
+        send_all(client_fd, response_buf, response_size);
         return;
     }
+
+    struct stat st;
+    if (fstat(file_fd, &st) == -1) {
+        perror("fstat");
+        close(file_fd);
+        return;
+    }
+
+    request.file_size = st.st_size;
     
-    response_size = http_build_response(&request, HTTP_STATUS_OK, http_header);
-    send_all(client_fd, http_header, response_size);
+    response_size = http_build_response(&request, HTTP_STATUS_OK, response_buf);
+    send_all(client_fd, response_buf, response_size);
+    memset(response_buf, 0, sizeof(response_buf));
+
+    ssize_t bytes_read;
+    while((bytes_read = read(file_fd, response_buf, sizeof(response_buf))) > 0) {
+        if (send_all(client_fd, response_buf, bytes_read) == -1) {
+            close(file_fd);
+            return;
+        }
+    }
+    close(file_fd);     
 }
 
 /**

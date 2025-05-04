@@ -12,7 +12,7 @@ struct HttpRequest {
     char method[FIELD_LEN];
     char http_version[FIELD_LEN];
     char path[MAX_PATH_LEN];
-    size_t file_size;
+    off_t file_size;
 };
 
 int http_parse_request(char *raw_request, struct HttpRequest *request);
