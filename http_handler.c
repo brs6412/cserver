@@ -28,7 +28,21 @@ const char *get_mime_type(const char *filename) {
  *      0 on success, -1 if 400 Bad Request should be sent.
  */
 int http_parse_request(char *raw_request, struct HttpRequest *request) {
-    char *ptr = strtok(raw_request, " ");
+    char request_line[REQUEST_LEN];
+    const char *eol = strstr(raw_request, "\r\n");
+    if (eol == NULL) {
+        return -1;
+    }
+
+    size_t len = eol - raw_request;
+    if (len >= sizeof(request_line)) {
+        return -1;
+    }
+    
+    strncpy(request_line, raw_request, len);
+    request_line[len] = '\0';
+ 
+    char *ptr = strtok(request_line, " ");
     if (ptr == NULL) {
         return -1;
     } else {
@@ -47,7 +61,7 @@ int http_parse_request(char *raw_request, struct HttpRequest *request) {
 
     ptr = strtok(NULL, " ");
 
-    if (ptr != NULL && strcmp(ptr, "HTTP/1.1") != 0) {
+    if (ptr == NULL || strcmp(ptr, "HTTP/1.1") != 0) {
         return -1;
     } else {
         strncpy(request->http_version, ptr, sizeof(request->http_version) - 1);

@@ -103,7 +103,7 @@ void handle_client(int client_fd) {
     if (strcmp(target, "/") == 0) {
         snprintf(request.path, MAX_PATH_LEN, "public/index.html");
     } else {
-        snprintf(request.path, MAX_PATH_LEN, "public%s", target);
+        snprintf(request.path, MAX_PATH_LEN, "public%.249s", target);
     }
 
     int file_fd = open(request.path, O_RDONLY);
