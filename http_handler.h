@@ -12,15 +12,10 @@ struct HttpRequest {
     char method[FIELD_LEN];
     char http_version[FIELD_LEN];
     char path[MAX_PATH_LEN];
+    size_t file_size;
 };
 
-struct HttpResponse {
-    char status[STATUS_LEN];   
-    char content_type[TYPE_LEN];
-    int content_len;
-    char connection[FIELD_LEN];
-};
-
-int handle_client(int client_fd);
+int http_parse_request(const char *raw_request, struct HttpRequest *request);
+int http_build_response(const struct HttpRequest *request, const char http_status, char *http_header);
 
 #endif /* HTTP_HANDLER_H */
