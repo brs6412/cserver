@@ -15,7 +15,7 @@ struct HttpRequest {
     size_t file_size;
 };
 
-int http_parse_request(const char *raw_request, struct HttpRequest *request);
-int http_build_response(const struct HttpRequest *request, const char http_status, char *http_header);
+int http_parse_request(char *raw_request, struct HttpRequest *request);
+int http_build_response(const struct HttpRequest *request, const char *http_status, char *http_header);
 
 #endif /* HTTP_HANDLER_H */

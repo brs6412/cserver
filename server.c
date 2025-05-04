@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "http_handler.h"
+#include "http_status.h"
 #include "server.h"
 
 /**
@@ -110,6 +111,10 @@ void handle_client(int client_fd) {
     char http_header[RESPONSE_LEN];
 
     ssize_t received = recv(client_fd, buf, sizeof(buf), 0); 
+    if (received < 0) {
+        perror("recv");
+        return;
+    }
 
     struct HttpRequest request = { .file_size = 0 };
     int valid_request = http_parse_request(buf, &request);
@@ -138,19 +143,21 @@ void handle_client(int client_fd) {
  */
 void start_server(struct HttpServer *server) {
     if (!server) {
-        return -1;
+        return;
     }
 
     int connection_backlog = MAX_BACKLOG;
-    if (listen(server.server_fd, connection_backlog) != 0) {
+    if (listen(server->server_fd, connection_backlog) != 0) {
         printf("Listen failed: %s \n", strerror(errno));
-        return 1;
+        return;
     }
     
+    int client_fd;
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
     printf("Waiting for a client to connect...\n");
-    int client_addr_len = sizeof(client_addr);
     
-    while ((client_fd = accept(server.server_fd, (struct sockaddr *) &client_addr, &client_addr_len))) {
+    while ((client_fd = accept(server->server_fd, (struct sockaddr *) &client_addr, &client_addr_len))) {
         printf("Client connected\n");
         handle_client(client_fd);
         close(client_fd);
@@ -173,3 +180,4 @@ int end_server(struct HttpServer *server) {
     }
     return 0;
 }
+

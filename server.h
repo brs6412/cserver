@@ -9,8 +9,8 @@ struct HttpServer {
     int port;
 };
 
-int init_server(int port);
-int start_server(struct HttpServer *server);
-void end_server(struct HttpServer *server); 
+int init_server(struct HttpServer *server, int port);
+void start_server(struct HttpServer *server);
+int end_server(struct HttpServer *server); 
 
 #endif /* SERVER_H */

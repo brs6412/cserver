@@ -50,7 +50,7 @@ int http_parse_request(char *raw_request, struct HttpRequest *request) {
     if (ptr != NULL && strcmp(ptr, "HTTP/1.1") != 0) {
         return -1;
     } else {
-        strncpy(request->http_version, ptr, sizeof(http_version) - 1);
+        strncpy(request->http_version, ptr, sizeof(request->http_version) - 1);
         request->http_version[sizeof(request->http_version) - 1] = '\0';
     }
 
@@ -75,3 +75,4 @@ int http_build_response(const struct HttpRequest *request, const char *http_stat
                         request->file_size);
     return header_size;
 }
+
