@@ -18,16 +18,16 @@ The server listens on port 4221 and handles basic HTTP GET requests. It serves f
 When a request comes in, the server:
 
 1. Parses the HTTP request line
-2. Maps the requested path to a file under the `build/` directory
-3. Reads the file and sends the contents back to the client
-4. Sets the appropriate `Content-Type` header based on the file extension
+2. Maps the requested path to a file under the `public/` directory
+3. Sets the appropriate `Content-Type` header based on the file extension
+4. Sends the response headers, and then sends the file as it reads it in chunks
 
 There’s no support for POST requests or routing logic, it’s purely for serving static files.
 
 ## How to run it
 
 ```bash
-gcc main.c -o server
+gcc main.c server.c http_handler.c -o server
 ./server
 ```
 
@@ -35,7 +35,7 @@ gcc main.c -o server
 
 There are a few things I'd like to add or improve over time:
 
-- Refactor C code (I know it's not pretty, but it's mine and it works)
+- ~~Refactor C code (I know it's not pretty, but it's mine and it works)~~ (Refactored into more modular code and made use of structs)
 - Create a debian package that handles systemd service setup and binary installation
 - Include update script that allows any user to pull site updates from the repo
 - Detect and prevent directory traversal attacks
