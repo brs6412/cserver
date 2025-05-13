@@ -13,12 +13,12 @@ I wanted to learn how HTTP servers work at a lower level, without relying on fra
 
 ## How it works
 
-The server listens on port 4221 and handles basic HTTP GET requests. It serves files out of the `public/` directory, which contains the static output from my React app.
+The server listens on port 4221 and handles basic HTTP GET requests. It serves files out of the directory listed in `cserver.conf`, defaulting to `/var/www/html`.
 
 When a request comes in, the server:
 
 1. Parses the HTTP request line
-2. Maps the requested path to a file under the `public/` directory
+2. Maps the requested path to a file under the 'serve_dir'. Directory traversal IS detected by comapring the resolved file path with the given 'serve_dir'.
 3. Sets the appropriate `Content-Type` header based on the file extension
 4. Sends the response headers, and then sends the file as it reads it in chunks
 
