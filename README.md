@@ -26,9 +26,31 @@ There’s no support for POST requests or routing logic, it’s purely for servi
 
 ## How to run it
 
-```bash
+```
 gcc main.c server.c http_handler.c -o server
 ./server
+```
+
+Alternatively, support for CMake has been added:
+```
+mkdir build
+cd build
+cmake ..
+make
+./server
+```
+
+## Configuration File
+
+The server can be configured using the `cserver.conf` file, which allows you to set various parameters. The configuration file will be installed in `/etc/cserver` and can be configured accordingly.
+
+Here’s an example of what the `cserver.conf` file looks like:
+
+```
+port=8080
+max_clients=100
+logfile=server.log
+serve_dir=/var/www/html
 ```
 
 ## Future Improvements
@@ -37,7 +59,6 @@ There are a few things I'd like to add or improve over time:
 
 - ~~Refactor C code (I know it's not pretty, but it's mine and it works)~~ (Refactored into more modular code and made use of structs)
 - Create a debian package that handles systemd service setup and ~~binary installation~~
-- Include update script that allows any user to pull site updates from the repo
-- Detect and prevent directory traversal attacks
+- ~~Detect and prevent directory traversal attacks~~
 - Add basic logging for requests and server activity
 - ~~Use configuration files instead of hardcoded values for better flexibility~~
