@@ -4,7 +4,7 @@
 #define METHOD_LEN      8 
 #define VERSION_LEN     16
 #define TYPE_LEN        32
-#define MAX_PATH_LEN    256 
+#define MAX_PATH_LEN    2048 
 #define REQUEST_LEN     4096
 #define RESPONSE_LEN    8192 
 

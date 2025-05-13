@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -11,20 +12,52 @@
 #include "http_status.h"
 #include "server.h"
 
+#define CONFIG_PATH "/etc/cserver/cserver.conf"
+
 /**
  * Creates server socket and binds to address using port.
  *
  * Parameters:
  *      server: Empty pointer to an HttpServer struct
- *      port: port number to use
  *
  * Returns:
  *      0 for success, -1 if error occured
  */
-int init_server(struct HttpServer *server, int port) {
+int init_server(struct HttpServer *server) {
     if (!server) {
         return -1;
     }
+
+    FILE *fp = fopen(CONFIG_PATH, "r");
+    if (!fp) {
+        printf("Error opening config file.");
+        return -1;
+    }
+
+    char line[256];
+    while(fgets(line, sizeof(line), fp)) {
+        line[strcspn(line, "\n")] = 0;
+        if (line[0] == '#' || line[0] == '\0') {
+            continue;
+        }
+        char *key = strtok(line, "=");
+        char *val = strtok(NULL, "=");
+
+        if (!key || !val) {
+            printf("Incomplete config file. Please verify.");
+        }
+
+        if (strcmp(key, "port") == 0) {
+            server->port = atoi(val);
+        } else if (strcmp(key, "max_clients") == 0) {
+            server->max_backlog = atoi(val);
+        } else if (strcmp(key, "logfile") == 0) {
+            strncpy(server->logfile, val, sizeof(server->logfile) - 1);
+        } else if (strcmp(key, "serve_dir") == 0) {
+            strncpy(server->serve_dir, val, sizeof(server->serve_dir) - 1);
+        }
+    }
+    fclose(fp);
 
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
@@ -33,18 +66,18 @@ int init_server(struct HttpServer *server, int port) {
     }
     
     struct sockaddr_in serv_addr = { .sin_family = AF_INET ,
-                                     .sin_port = htons(port),
+                                     .sin_port = htons(server->port),
                                      .sin_addr = { htonl(INADDR_ANY) },
                                     };
 
-    if (bind(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
+    int addr_size = sizeof(serv_addr);
+    if (bind(server_fd, (struct sockaddr *) &serv_addr, addr_size) != 0) {
         printf("Bind failed: %s \n", strerror(errno));
         close(server_fd);
         return -1;
     }
 
     server->server_fd = server_fd;
-    server->port = port;
     return 0;
 }
 
@@ -77,7 +110,7 @@ ssize_t send_all(int client_fd, const void *buffer, size_t length) {
 /**
 * Reads the client request and sends a response using the given file descriptor.
 */
-void handle_client(int client_fd) {
+void handle_client(struct HttpServer *server, int client_fd) {
     int response_size;
     char buf[REQUEST_LEN];
     char response_buf[RESPONSE_LEN];
@@ -91,19 +124,31 @@ void handle_client(int client_fd) {
     struct HttpRequest request = { .file_size = 0 };
     int valid_request = http_parse_request(buf, &request);
     if (valid_request == -1) {
-        response_size = http_build_response(&request, HTTP_STATUS_BAD_REQUEST, response_buf);
+        response_size = http_build_response(
+                                &request, 
+                                HTTP_STATUS_BAD_REQUEST, 
+                                response_buf);
         send_all(client_fd, response_buf, response_size);
         return;
     }
     
-    char target[MAX_PATH_LEN];
+    char target[MAX_DIR_LEN];
     strncpy(target, request.path, sizeof(target) - 1);
     target[sizeof(target) - 1] = '\0';
 
     if (strcmp(target, "/") == 0) {
-        snprintf(request.path, MAX_PATH_LEN, "public/index.html");
+        snprintf(
+            request.path, 
+            sizeof(request.path), 
+            "%s/index.html", 
+            server->serve_dir);
     } else {
-        snprintf(request.path, MAX_PATH_LEN, "public%.249s", target);
+        snprintf(
+            request.path, 
+            sizeof(request.path) - 1, 
+            "%s%s", 
+            server->serve_dir, 
+            target);
     }
 
     int file_fd = open(request.path, O_RDONLY);
@@ -147,8 +192,7 @@ void start_server(struct HttpServer *server) {
         return;
     }
 
-    int connection_backlog = MAX_BACKLOG;
-    if (listen(server->server_fd, connection_backlog) != 0) {
+    if (listen(server->server_fd, server->max_backlog) != 0) {
         printf("Listen failed: %s \n", strerror(errno));
         return;
     }
@@ -160,7 +204,7 @@ void start_server(struct HttpServer *server) {
     
     while ((client_fd = accept(server->server_fd, (struct sockaddr *) &client_addr, &client_addr_len))) {
         printf("Client connected\n");
-        handle_client(client_fd);
+        handle_client(server, client_fd);
         close(client_fd);
     }
 }

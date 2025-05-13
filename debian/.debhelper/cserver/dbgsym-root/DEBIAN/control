@@ -1,0 +1,13 @@
+Package: cserver-dbgsym
+Package-Type: ddeb
+Source: cserver
+Version: 1.0-1
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Ben Sippel <bsippel@rit.edu>
+Installed-Size: 28
+Depends: cserver (= 1.0-1)
+Section: debug
+Priority: optional
+Description: debug symbols for cserver
+Build-Ids: 4e67c6974888c7cb88b05869390fd8dbf3c7c080

@@ -1,3 +1,5 @@
-serv
+server
 core
 test.c
+build/
+obj-x86_64-linux-gnu/

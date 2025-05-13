@@ -1,0 +1,10 @@
+Source: cserver
+Maintainer: Ben Sippel <bsippel@rit.edu>
+Priority: optional
+Build-Depends: debhelper-compat(= 13), cmake, gcc, make
+
+Package: cserver
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Simple C HTTP server
+ A basic C HTTP server that responds to GET requests and serves files.

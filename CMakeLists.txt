@@ -4,3 +4,4 @@ project(server)
 add_executable(server main.c server.c http_handler.c)
 
 install(TARGETS server DESTINATION bin)
+install(FILES cserver.conf DESTINATION /etc/cserver)

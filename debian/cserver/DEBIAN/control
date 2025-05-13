@@ -1,0 +1,9 @@
+Package: cserver
+Version: 1.0-1
+Architecture: amd64
+Maintainer: Ben Sippel <bsippel@rit.edu>
+Installed-Size: 27
+Depends: libc6 (>= 2.34)
+Priority: optional
+Description: Simple C HTTP server
+ A basic C HTTP server that responds to GET requests and serves files.
