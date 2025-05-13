@@ -1,0 +1,7 @@
+/home/ben/dev/cserver/build/CMakeFiles/server.dir
+/home/ben/dev/cserver/build/CMakeFiles/edit_cache.dir
+/home/ben/dev/cserver/build/CMakeFiles/rebuild_cache.dir
+/home/ben/dev/cserver/build/CMakeFiles/list_install_components.dir
+/home/ben/dev/cserver/build/CMakeFiles/install.dir
+/home/ben/dev/cserver/build/CMakeFiles/install/local.dir
+/home/ben/dev/cserver/build/CMakeFiles/install/strip.dir
